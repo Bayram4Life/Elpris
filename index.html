@@ -4,31 +4,31 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Elpris DK2</title>
-  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
   <style>
     :root {
       --cream: transparent;
-      --ink: #1a1814;
-      --ink-soft: #5a5550;
-      --ink-faint: #b0ab a4;
-      --border: #e2ddd6;
-      --low: #3a7d5a;
-      --mid: #c07c28;
-      --high: #b83c3c;
-      --accent: #2a5c8a;
+      --ink: #ffffff;
+      --ink-soft: rgba(255,255,255,0.7);
+      --ink-faint: rgba(255,255,255,0.45);
+      --border: rgba(255,255,255,0.2);
+      --low: #4ecb8a;
+      --mid: #f0a040;
+      --high: #f05555;
+      --accent: #7ab8f5;
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
-      font-family: 'DM Mono', monospace;
+      font-family: 'Roboto', sans-serif;
       background: var(--cream);
       color: var(--ink);
       min-height: 100vh;
       padding: 20px 18px;
     }
 
-    /* Header */
+    /* Header — keep original colors, not white */
     .header {
       display: flex;
       justify-content: space-between;
@@ -37,7 +37,7 @@
     }
 
     .title {
-      font-family: 'DM Serif Display', serif;
+      font-family: 'Roboto', sans-serif;
       font-size: 20px;
     }
 
@@ -62,13 +62,13 @@
     /* Current summary row */
     .summary {
       display: flex;
-      align-items: baseline;
+      align-items: center;
       gap: 8px;
-      margin-bottom: 16px;
+      margin-bottom: 12px;
     }
 
     .big-price {
-      font-family: 'DM Serif Display', serif;
+      font-family: 'Roboto', sans-serif;
       font-size: 58px;
       line-height: 1;
       letter-spacing: -2px;
@@ -96,32 +96,32 @@
     .bar-list {
       display: flex;
       flex-direction: column;
-      gap: 3px;
+      gap: 2px;
     }
 
     .bar-row {
       display: flex;
       align-items: center;
       gap: 8px;
-      height: 26px;
+      height: 18px;
     }
 
     .bar-row.is-current {
-      background: rgba(0,0,0,0.04);
+      background: rgba(255,255,255,0.08);
       border-radius: 3px;
       margin: 0 -4px;
       padding: 0 4px;
     }
 
     .bar-row.is-midnight {
-      margin-top: 6px;
-      padding-top: 6px;
+      margin-top: 5px;
+      padding-top: 5px;
       border-top: 1px dashed var(--border);
     }
 
     .time-label {
       font-size: 10px;
-      color: #aaa59e;
+      color: var(--ink-faint);
       width: 38px;
       flex-shrink: 0;
       text-align: right;
@@ -129,14 +129,14 @@
     }
 
     .bar-row.is-current .time-label {
-      color: var(--ink);
+      color: white;
       font-weight: 500;
     }
 
     .bar-track {
       flex: 1;
-      height: 16px;
-      background: #ece8e0;
+      height: 8px;
+      background: rgba(255,255,255,0.1);
       border-radius: 3px;
       overflow: hidden;
       position: relative;
@@ -149,7 +149,7 @@
     }
 
     .bar-row.is-future .bar-fill {
-      opacity: 0.5;
+      opacity: 0.4;
     }
 
     /* "Nu" pulse on current bar */
@@ -175,6 +175,7 @@
       width: 46px;
       flex-shrink: 0;
       letter-spacing: 0.01em;
+      color: white;
     }
 
     .bar-row.is-current .price-label {
@@ -182,7 +183,7 @@
     }
 
     .bar-row.is-future .price-label {
-      opacity: 0.6;
+      opacity: 0.55;
     }
 
     /* Midnight label */
@@ -201,26 +202,26 @@
       font-weight: 500;
       letter-spacing: 0.1em;
       text-transform: uppercase;
-      color: var(--ink);
-      background: rgba(0,0,0,0.08);
+      color: white;
+      background: rgba(255,255,255,0.15);
       padding: 1px 5px;
       border-radius: 10px;
     }
 
     /* Footer */
     .footer {
-      margin-bottom: 14px;
-      padding-bottom: 12px;
+      margin-bottom: 12px;
+      padding-bottom: 10px;
       border-bottom: 1px solid var(--border);
       display: flex;
       justify-content: space-between;
       align-items: center;
     }
 
-    .stat-value { font-size: 13px; font-weight: 500; }
+    .stat-value { font-size: 13px; font-weight: 500; color: white; }
     .stat-label {
       font-size: 8px;
-      color: #aaa59e;
+      color: var(--ink-faint);
       letter-spacing: 0.1em;
       text-transform: uppercase;
       margin-top: 1px;
@@ -228,7 +229,7 @@
 
     .updated {
       font-size: 8px;
-      color: #aaa59e;
+      color: var(--ink-faint);
       text-align: right;
       line-height: 1.6;
     }
@@ -237,13 +238,13 @@
       font-size: 9px;
       letter-spacing: 0.14em;
       text-transform: uppercase;
-      color: #aaa59e;
+      color: var(--ink-faint);
       margin-bottom: 2px;
     }
 
     .current-hour-label {
       font-size: 10px;
-      color: #aaa59e;
+      color: var(--ink-faint);
       letter-spacing: 0.04em;
       margin-top: 2px;
     }
