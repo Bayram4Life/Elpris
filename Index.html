@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="da">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Elpris DK2</title>
+
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+
+<style>
+:root {
+  --bg: rgba(0,0,0,0.35);
+  --text: #fff;
+  --muted: rgba(255,255,255,0.6);
+  --low: #4ecb8a;
+  --mid: #f0a040;
+  --high: #f05555;
+}
+
+body {
+  font-family: 'Inter', sans-serif;
+  color: var(--text);
+  padding: 20px;
+}
+
+/* Container */
+.card {
+  backdrop-filter: blur(10px);
+  background: var(--bg);
+  border-radius: 14px;
+  padding: 18px;
+  max-width: 420px;
+  margin-top: 10px;
+}
+
+/* Main price */
+.price-row {
+  display:flex;
+  align-items:flex-end;
+  justify-content:space-between;
+}
+
+.price {
+  font-size:64px;
+  font-weight:600;
+  letter-spacing:-2px;
+}
+
+.unit {
+  font-size:14px;
+  color: var(--muted);
+  margin-left:6px;
+}
+
+.badge {
+  font-size:12px;
+  padding:6px 12px;
+  border-radius:20px;
+  font-weight:500;
+}
+
+/* Stats row */
+.stats {
+  display:flex;
+  justify-content:space-between;
+  margin:10px 0 14px;
+  font-size:12px;
+}
+
+.stats span {
+  color: var(--muted);
+}
+
+/* Bars */
+.bar-list {
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+}
+
+.row {
+  display:flex;
+  align-items:center;
+  gap:8px;
+  font-size:12px;
+}
+
+.time {
+  width:42px;
+  text-align:right;
+  color: var(--muted);
+}
+
+.track {
+  flex:1;
+  height:8px;
+  background: rgba(255,255,255,0.08);
+  border-radius:4px;
+  overflow:hidden;
+}
+
+.fill {
+  height:100%;
+  border-radius:4px;
+}
+
+.value {
+  width:48px;
+  text-align:right;
+}
+
+/* cheapest highlight */
+.cheapest {
+  outline: 1px solid var(--low);
+  border-radius:4px;
+}
+</style>
+</head>
+
+<body>
+
+<div class="card" id="app">Indlæser...</div>
+
+<script>
+const pad = n => String(n).padStart(2, '0');
+
+function apiUrl(d) {
+  return `https://www.elprisenligenu.dk/api/v1/prices/${d.getFullYear()}/${pad(d.getMonth()+1)}-${pad(d.getDate())}_DK2.json`;
+}
+
+async function load() {
+  const now = new Date();
+  const res = await fetch(apiUrl(now));
+  const data = await res.json();
+
+  const prices = data.map(r => r.DKK_per_kWh);
+  const min = Math.min(...prices);
+  const max = Math.max(...prices);
+  const avg = prices.reduce((a,b)=>a+b,0)/prices.length;
+
+  const current = data[now.getHours()].DKK_per_kWh;
+
+  function color(v){
+    const r=(v-min)/(max-min);
+    return r<0.33?'var(--low)':r<0.66?'var(--mid)':'var(--high)';
+  }
+
+  function format(v){
+    return v.toFixed(2).replace('.',',');
+  }
+
+  // find cheapest hour
+  const cheapestIndex = prices.indexOf(min);
+
+  const bars = data.map((r,i)=>{
+    const pct = ((r.DKK_per_kWh-min)/(max-min))*100;
+    return `
+      <div class="row ${i===cheapestIndex?'cheapest':''}">
+        <div class="time">${pad(i)}:00</div>
+        <div class="track">
+          <div class="fill" style="width:${pct}%;background:${color(r.DKK_per_kWh)}"></div>
+        </div>
+        <div class="value">${format(r.DKK_per_kWh)}</div>
+      </div>
+    `;
+  }).join('');
+
+  document.getElementById('app').innerHTML = `
+    <div class="price-row">
+      <div>
+        <span class="price" style="color:${color(current)}">${format(current)}</span>
+        <span class="unit">kr/kWh</span>
+      </div>
+      <div class="badge" style="background:${color(current)}">
+        Nu: ${current===min?'Billigst':current===max?'Dyrest':'Normal'}
+      </div>
+    </div>
+
+    <div class="stats">
+      <div><span>Lav</span><br>${format(min)}</div>
+      <div><span>Snit</span><br>${format(avg)}</div>
+      <div><span>Høj</span><br>${format(max)}</div>
+    </div>
+
+    <div class="bar-list">${bars}</div>
+  `;
+}
+
+load();
+setInterval(load, 900000);
+</script>
+
+</body>
+</html>
