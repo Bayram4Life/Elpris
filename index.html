@@ -188,10 +188,9 @@ async function load() {
     const pris = prices[i];
     const pct = beregnBjælke(pris, min, max);
     const isCurrentHour = i === 0;
-    const dayLabel = e.isNextDay ? ' <span style="color:var(--muted);font-size:10px">+1</span>' : '';
     return `
       <div class="row ${isCurrentHour ? 'current-hour' : ''}">
-        <div class="time">${pad(e.hour)}:00${dayLabel}</div>
+        <div class="time">${pad(e.hour)}:00</div>
         <div class="track">
           <div class="fill" style="width:${pct}%;background:${color(pris)}"></div>
         </div>
