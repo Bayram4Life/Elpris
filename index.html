@@ -4,9 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Elpris DK2</title>
-
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-
 <style>
 :root {
   --bg: rgba(0,0,0,0.35);
@@ -16,14 +14,11 @@
   --mid: #f0a040;
   --high: #f05555;
 }
-
 body {
   font-family: 'Inter', sans-serif;
   color: var(--text);
   padding: 20px;
 }
-
-/* Container */
 .card {
   backdrop-filter: blur(10px);
   background: var(--bg);
@@ -32,65 +27,58 @@ body {
   max-width: 420px;
   margin-top: 10px;
 }
-
-/* Main price */
 .price-row {
   display:flex;
   align-items:flex-end;
   justify-content:space-between;
 }
-
 .price {
   font-size:64px;
   font-weight:600;
   letter-spacing:-2px;
 }
-
 .unit {
   font-size:14px;
   color: var(--muted);
   margin-left:6px;
 }
-
 .badge {
   font-size:12px;
   padding:6px 12px;
   border-radius:20px;
   font-weight:500;
 }
-
-/* Stats row */
 .stats {
   display:flex;
   justify-content:space-between;
   margin:10px 0 14px;
   font-size:12px;
 }
-
 .stats span {
   color: var(--muted);
 }
-
-/* Bars */
 .bar-list {
   display:flex;
   flex-direction:column;
   gap:6px;
 }
-
 .row {
   display:flex;
   align-items:center;
   gap:8px;
   font-size:12px;
 }
-
+.row.current-hour {
+  font-weight:600;
+}
 .time {
   width:42px;
   text-align:right;
   color: var(--muted);
 }
-
+.row.current-hour .time {
+  color: #fff;
+}
 .track {
   flex:1;
   height:8px;
@@ -98,69 +86,116 @@ body {
   border-radius:4px;
   overflow:hidden;
 }
-
 .fill {
   height:100%;
   border-radius:4px;
 }
-
 .value {
   width:48px;
   text-align:right;
 }
-
-/* cheapest highlight */
-.cheapest {
-  outline: 1px solid var(--low);
-  border-radius:4px;
-}
 </style>
 </head>
-
 <body>
-
 <div class="card" id="app">Indlæser...</div>
-
 <script>
 const pad = n => String(n).padStart(2, '0');
+
+// ─── AFGIFTER OG TARIFFER ────────────────────────────────
+const ELAFGIFT      = 0.01;
+const TRANSMISSION  = 0.14;
+const MOMS          = 1.25;
+const KORREKTION    = 0.05;
+
+const RADIUS = {
+  lav:    0.1017,
+  normal: 0.1694,
+  hoj:    0.5081
+};
+
+function getRadiusTarif(hour) {
+  if (hour >= 0  && hour <= 5)  return RADIUS.lav;
+  if (hour >= 17 && hour <= 20) return RADIUS.hoj;
+  return RADIUS.normal;
+}
+
+function beregnPris(spotPris, hour) {
+  const radiusTarif = getRadiusTarif(hour);
+  return ((spotPris + ELAFGIFT + TRANSMISSION + radiusTarif) * MOMS) - KORREKTION;
+}
+// ─────────────────────────────────────────────────────────
 
 function apiUrl(d) {
   return `https://www.elprisenligenu.dk/api/v1/prices/${d.getFullYear()}/${pad(d.getMonth()+1)}-${pad(d.getDate())}_DK2.json`;
 }
 
+// Skalér bjælke: billigste = MIN_BAR%, dyreste = 100%
+const MIN_BAR = 25;
+
+function beregnBjælke(pris, min, max) {
+  if (max === min) return MIN_BAR;
+  return MIN_BAR + ((pris - min) / (max - min)) * (100 - MIN_BAR);
+}
+
 async function load() {
   const now = new Date();
-  const res = await fetch(apiUrl(now));
-  const data = await res.json();
+  const currentHour = now.getHours();
 
-  const prices = data.map(r => r.DKK_per_kWh);
+  // Hent dagens data
+  const resToday = await fetch(apiUrl(now));
+  const dataToday = await resToday.json();
+
+  // Hent morgendagens data
+  const tomorrow = new Date(now);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  let dataTomorrow = [];
+  try {
+    const resTomorrow = await fetch(apiUrl(tomorrow));
+    if (resTomorrow.ok) {
+      dataTomorrow = await resTomorrow.json();
+    }
+  } catch(e) {}
+
+  // Byg rullende 24 timers vindue fra nuværende time
+  const window24 = [];
+  for (let i = 0; i < 24; i++) {
+    const hour = (currentHour + i) % 24;
+    const isNextDay = (currentHour + i) >= 24;
+    if (isNextDay && dataTomorrow.length > 0) {
+      window24.push({ hour, spotPris: dataTomorrow[hour].DKK_per_kWh, isNextDay: true });
+    } else if (!isNextDay) {
+      window24.push({ hour, spotPris: dataToday[hour].DKK_per_kWh, isNextDay: false });
+    }
+  }
+
+  // Beregn priser for vinduet
+  const prices = window24.map(e => beregnPris(e.spotPris, e.hour));
   const min = Math.min(...prices);
   const max = Math.max(...prices);
-  const avg = prices.reduce((a,b)=>a+b,0)/prices.length;
+  const avg = prices.reduce((a,b) => a+b, 0) / prices.length;
+  const current = beregnPris(dataToday[currentHour].DKK_per_kWh, currentHour);
 
-  const current = data[now.getHours()].DKK_per_kWh;
-
-  function color(v){
-    const r=(v-min)/(max-min);
-    return r<0.33?'var(--low)':r<0.66?'var(--mid)':'var(--high)';
+  function color(v) {
+    const r = (v - min) / (max - min);
+    return r < 0.33 ? 'var(--low)' : r < 0.66 ? 'var(--mid)' : 'var(--high)';
   }
 
-  function format(v){
-    return v.toFixed(2).replace('.',',');
+  function format(v) {
+    return v.toFixed(2).replace('.', ',');
   }
 
-  // find cheapest hour
-  const cheapestIndex = prices.indexOf(min);
-
-  const bars = data.map((r,i)=>{
-    const pct = ((r.DKK_per_kWh-min)/(max-min))*100;
+  const bars = window24.map((e, i) => {
+    const pris = prices[i];
+    const pct = beregnBjælke(pris, min, max);
+    const isCurrentHour = i === 0;
+    const dayLabel = e.isNextDay ? ' <span style="color:var(--muted);font-size:10px">+1</span>' : '';
     return `
-      <div class="row ${i===cheapestIndex?'cheapest':''}">
-        <div class="time">${pad(i)}:00</div>
+      <div class="row ${isCurrentHour ? 'current-hour' : ''}">
+        <div class="time">${pad(e.hour)}:00${dayLabel}</div>
         <div class="track">
-          <div class="fill" style="width:${pct}%;background:${color(r.DKK_per_kWh)}"></div>
+          <div class="fill" style="width:${pct}%;background:${color(pris)}"></div>
         </div>
-        <div class="value">${format(r.DKK_per_kWh)}</div>
+        <div class="value" style="color:${color(pris)}">${format(pris)}</div>
       </div>
     `;
   }).join('');
@@ -175,13 +210,11 @@ async function load() {
         Nu: ${current===min?'Billigst':current===max?'Dyrest':'Normal'}
       </div>
     </div>
-
     <div class="stats">
       <div><span>Lav</span><br>${format(min)}</div>
       <div><span>Snit</span><br>${format(avg)}</div>
       <div><span>Høj</span><br>${format(max)}</div>
     </div>
-
     <div class="bar-list">${bars}</div>
   `;
 }
@@ -189,6 +222,5 @@ async function load() {
 load();
 setInterval(load, 900000);
 </script>
-
 </body>
 </html>
