@@ -47,7 +47,7 @@ jobs:
           # PNG i dobbelt opløsning til Marcos billed-widget (Marco tager ikke SVG)
           rsvg-convert --zoom 2 -o site/elpris.png site/elpris.svg
           ls -la site/elpris.png
-          cp index.html skaerm.html site/
+          cp index.html site/
 
       - uses: actions/upload-pages-artifact@v3
         with:

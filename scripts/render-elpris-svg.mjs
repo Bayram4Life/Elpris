@@ -80,37 +80,45 @@ const color = v => { const r = max === min ? 0 : (v - min) / (max - min); return
 const bar = v => max === min ? MIN_BAR : MIN_BAR + ((v - min) / (max - min)) * (100 - MIN_BAR);
 
 // ─── Layout ──────────────────────────────────────────────
-const W = 420, P = 18, ROW = 20, ROWS_Y = 156;
-const H = ROWS_Y + win.length * ROW + 20;
+// Stor tekst i to kolonner (12 + 12 timer), så kortet kan læses på afstand,
+// også når Marco skalerer billedet ned til widgetens størrelse.
+const W = 640, P = 28, GAP = 32, ROW = 38, ROWS_Y = 232;
+const PER_COL = 12;
+const nRows = Math.min(PER_COL, win.length);
+const H = ROWS_Y + nRows * ROW + 28;
 const FONT = "Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif";
 const status = current === min ? 'Billigst' : current === max ? 'Dyrest' : 'Normal';
 const badgeText = `Nu: ${status}`;
-const badgeW = badgeText.length * 7 + 24;
-const trackX = P + 42 + 8, trackW = W - P - 48 - 8 - trackX;
+const badgeW = badgeText.length * 11 + 36;
+const colW = (W - 2 * P - GAP) / 2;
+const TIME_W = 62, VAL_W = 58;
 
 const rows = win.map((e, i) => {
-  const y = ROWS_Y + i * ROW;
+  const col = Math.floor(i / PER_COL), r = i % PER_COL;
+  const x0 = P + col * (colW + GAP);
+  const y = ROWS_Y + r * ROW;
   const c = color(e.pris);
-  const bold = i === 0 ? ' font-weight="600"' : '';
+  const bold = i === 0 ? ' font-weight="700"' : '';
+  const trackX = x0 + TIME_W + 8, trackW = colW - TIME_W - VAL_W - 16;
   return `
-  <text x="${P + 42}" y="${y + 8}" text-anchor="end" font-size="12" fill="${i === 0 ? C.text : C.muted}"${bold}>${pad(e.hour)}:00</text>
-  <rect x="${trackX}" y="${y}" width="${trackW}" height="8" rx="4" fill="${C.track}"/>
-  <rect x="${trackX}" y="${y}" width="${(trackW * bar(e.pris) / 100).toFixed(1)}" height="8" rx="4" fill="${c}"/>
-  <text x="${W - P}" y="${y + 8}" text-anchor="end" font-size="12" fill="${c}"${bold}>${fmt(e.pris)}</text>`;
+  <text x="${x0 + TIME_W}" y="${y + 13}" text-anchor="end" font-size="21" fill="${i === 0 ? C.text : C.muted}"${bold}>${pad(e.hour)}:00</text>
+  <rect x="${trackX}" y="${y + 1}" width="${trackW}" height="12" rx="6" fill="${C.track}"/>
+  <rect x="${trackX}" y="${y + 1}" width="${(trackW * bar(e.pris) / 100).toFixed(1)}" height="12" rx="6" fill="${c}"/>
+  <text x="${x0 + colW}" y="${y + 13}" text-anchor="end" font-size="21" font-weight="${i === 0 ? 700 : 600}" fill="${c}">${fmt(e.pris)}</text>`;
 }).join('');
 
 const stat = (x, anchor, label, v) => `
-  <text x="${x}" y="112" text-anchor="${anchor}" font-size="12" fill="${C.muted}">${label}</text>
-  <text x="${x}" y="128" text-anchor="${anchor}" font-size="12" fill="${C.text}">${fmt(v)}</text>`;
+  <text x="${x}" y="166" text-anchor="${anchor}" font-size="19" fill="${C.muted}">${label}</text>
+  <text x="${x}" y="196" text-anchor="${anchor}" font-size="26" font-weight="600" fill="${C.text}">${fmt(v)}</text>`;
 
 const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" font-family="${FONT}">
-  <rect width="${W}" height="${H}" rx="14" fill="rgba(0,0,0,0.55)"/>
-  <text x="${P}" y="82"><tspan font-size="64" font-weight="600" letter-spacing="-2" fill="${color(current)}">${fmt(current)}</tspan><tspan dx="8" font-size="14" fill="${C.muted}">kr/kWh</tspan></text>
-  <rect x="${W - P - badgeW}" y="46" width="${badgeW}" height="26" rx="13" fill="${color(current)}"/>
-  <text x="${W - P - badgeW / 2}" y="63" text-anchor="middle" font-size="12" font-weight="500" fill="${C.text}">${badgeText}</text>
+  <rect width="${W}" height="${H}" rx="20" fill="rgba(0,0,0,0.55)"/>
+  <text x="${P}" y="118"><tspan font-size="104" font-weight="700" letter-spacing="-3" fill="${color(current)}">${fmt(current)}</tspan><tspan dx="12" font-size="24" fill="${C.muted}">kr/kWh</tspan></text>
+  <rect x="${W - P - badgeW}" y="60" width="${badgeW}" height="44" rx="22" fill="${color(current)}"/>
+  <text x="${W - P - badgeW / 2}" y="90" text-anchor="middle" font-size="21" font-weight="600" fill="${C.text}">${badgeText}</text>
   ${stat(P, 'start', 'Lav', min)}${stat(W / 2, 'middle', 'Snit', avg)}${stat(W - P, 'end', 'Høj', max)}
   ${rows}
-  <text x="${W - P}" y="${H - 6}" text-anchor="end" font-size="9" fill="${C.muted}">Opdateret ${pad(nu.h)}:${nu.min}</text>
+  <text x="${W - P}" y="${H - 10}" text-anchor="end" font-size="14" fill="${C.muted}">Opdateret ${pad(nu.h)}:${nu.min}</text>
 </svg>
 `;
 
