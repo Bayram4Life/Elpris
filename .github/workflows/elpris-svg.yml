@@ -48,6 +48,11 @@ jobs:
       - id: deploy
         uses: actions/deploy-pages@v4
 
+      - name: Tjek at elpris.svg er online
+        run: |
+          sleep 20
+          curl -fsSI "${{ steps.deploy.outputs.page_url }}elpris.svg" | grep -i -E "^HTTP|content-type"
+
       - name: Genindlæs Marco-skærmene
         if: env.MARCO_TOKEN != ''
         run: |
