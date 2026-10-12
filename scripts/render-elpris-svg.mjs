@@ -104,6 +104,7 @@ const stat = (x, anchor, label, v) => `
   <text x="${x}" y="128" text-anchor="${anchor}" font-size="12" fill="${C.text}">${fmt(v)}</text>`;
 
 const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" font-family="${FONT}">
+  <rect width="${W}" height="${H}" rx="14" fill="rgba(0,0,0,0.55)"/>
   <text x="${P}" y="82"><tspan font-size="64" font-weight="600" letter-spacing="-2" fill="${color(current)}">${fmt(current)}</tspan><tspan dx="8" font-size="14" fill="${C.muted}">kr/kWh</tspan></text>
   <rect x="${W - P - badgeW}" y="46" width="${badgeW}" height="26" rx="13" fill="${color(current)}"/>
   <text x="${W - P - badgeW / 2}" y="63" text-anchor="middle" font-size="12" font-weight="500" fill="${C.text}">${badgeText}</text>

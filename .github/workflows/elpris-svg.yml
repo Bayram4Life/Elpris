@@ -35,10 +35,18 @@ jobs:
         with:
           node-version: 22
 
-      - name: Tegn elpris.svg
+      - name: Installer PNG-konvertering og skrifttype
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq librsvg2-bin fonts-inter
+
+      - name: Tegn elpris.svg og elpris.png
         run: |
           mkdir -p site
           node scripts/render-elpris-svg.mjs site/elpris.svg
+          # PNG i dobbelt opløsning til Marcos billed-widget (Marco tager ikke SVG)
+          rsvg-convert --zoom 2 -o site/elpris.png site/elpris.svg
+          ls -la site/elpris.png
           cp index.html skaerm.html site/
 
       - uses: actions/upload-pages-artifact@v3
@@ -51,7 +59,7 @@ jobs:
       - name: Tjek at elpris.svg er online
         run: |
           sleep 20
-          curl -fsSI "${{ steps.deploy.outputs.page_url }}elpris.svg" | grep -i -E "^HTTP|content-type"
+          curl -fsSI "${{ steps.deploy.outputs.page_url }}elpris.png" | grep -i -E "^HTTP|content-type|content-length"
 
       - name: Genindlæs Marco-skærmene
         if: env.MARCO_TOKEN != ''
