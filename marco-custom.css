@@ -1,0 +1,18 @@
+/* Elpris-kort til Marco: indsæt i Marco → Screen → Custom CSS.
+   Flyt kortet med right/bottom (eller left/top), og skift størrelse med width. */
+body::after {
+  content: "";
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  width: 300px;
+  aspect-ratio: 420 / 656;
+  background:
+    url("https://bayram4life.github.io/Elpris/elpris.svg") center / contain no-repeat,
+    rgba(0, 0, 0, 0.35);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  border-radius: 14px;
+  z-index: 50;
+  pointer-events: none;
+}

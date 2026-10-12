@@ -1,0 +1,58 @@
+name: Elpris-billede til Marco
+
+# Tegner elpris.svg hver time og udgiver hele repoet (index.html + elpris.svg) på GitHub Pages.
+# Kræver: Settings → Pages → Source = "GitHub Actions".
+# Valgfrit: secret MARCO_TOKEN (API-token fra Marco → API & webhooks), så skærmene genindlæses efter hver opdatering.
+
+on:
+  schedule:
+    - cron: '3 * * * *'   # hver time, 3 min over (UTC, men scriptet regner selv i dansk tid)
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: elpris-pages
+  cancel-in-progress: true
+
+jobs:
+  build-deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    env:
+      MARCO_TOKEN: ${{ secrets.MARCO_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Tegn elpris.svg
+        run: |
+          mkdir -p site
+          node scripts/render-elpris-svg.mjs site/elpris.svg
+          cp index.html site/
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+      - id: deploy
+        uses: actions/deploy-pages@v4
+
+      - name: Genindlæs Marco-skærmene
+        if: env.MARCO_TOKEN != ''
+        run: |
+          sleep 30
+          curl -fsS -X POST \
+            -H "Authorization: Bearer $MARCO_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d '{}' https://app.marcohome.app/api/hooks/reload
