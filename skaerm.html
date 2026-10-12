@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="da">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Familieskærm</title>
+<!--
+  Viser Marco og elpriskortet på samme skærm.
+  Brug:  skaerm.html?marco=<Marco-skærmens private link>
+  Valgfrit:
+    &layout=split    Marco til venstre, elpriser i en kolonne til højre (standard)
+    &layout=overlay  Marco i fuld skærm, elpriskortet svæver i et hjørne
+    &side=left       kolonne/kort i venstre side i stedet for højre
+    &width=26        kolonnens bredde i procent af skærmen (split)
+    &bg=%23101418    baggrundsfarve bag elpriserne (split)
+  Linket til Marco læses kun i browseren og gemmes ingen steder.
+-->
+<style>
+  :root { --bg: #101418; --col: 26vw; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #000; }
+  .wrap { display: flex; height: 100vh; width: 100vw; }
+  .wrap.left { flex-direction: row-reverse; }
+  #marco { flex: 1; border: 0; height: 100%; min-width: 0; background: #000; }
+  .col { width: var(--col); height: 100%; background: var(--bg); position: relative; overflow: hidden; }
+  .card-frame { position: absolute; top: 0; left: 0; border: 0; width: 460px; height: 720px;
+                background: transparent; transform-origin: top left; }
+  /* overlay */
+  .wrap.overlay .col { position: fixed; bottom: 24px; right: 24px; width: 300px; height: 470px; background: transparent; }
+  .wrap.overlay.left .col { right: auto; left: 24px; }
+  .hint { color: #ccc; font: 16px/1.5 system-ui, sans-serif; padding: 40px; max-width: 640px; }
+  .hint code { background: #222; padding: 2px 6px; border-radius: 4px; }
+</style>
+</head>
+<body>
+<div class="wrap" id="wrap">
+  <iframe id="marco" title="Marco" allow="autoplay"></iframe>
+  <div class="col" id="col">
+    <iframe class="card-frame" id="card" title="Elpris" src="index.html" scrolling="no"></iframe>
+  </div>
+</div>
+<script>
+  const q = new URLSearchParams(location.search);
+  const marco = q.get('marco');
+  const wrap = document.getElementById('wrap');
+  const col = document.getElementById('col');
+  const card = document.getElementById('card');
+
+  if (!marco) {
+    wrap.innerHTML = '<div class="hint"><b>Mangler Marco-link.</b><br>Åbn siden som ' +
+      '<code>skaerm.html?marco=https://…/d/…</code> med din Marco-skærms private link ' +
+      '(Marco → Screen → Settings → Private link).</div>';
+  } else {
+    document.getElementById('marco').src = marco;
+  }
+  if ((q.get('layout') || 'split') === 'overlay') wrap.classList.add('overlay');
+  if (q.get('side') === 'left') wrap.classList.add('left');
+  if (q.get('width')) document.documentElement.style.setProperty('--col', Number(q.get('width')) + 'vw');
+  if (q.get('bg')) document.documentElement.style.setProperty('--bg', q.get('bg'));
+
+  // Skalér elpriskortet, så det fylder kolonnen uden at blive beskåret
+  function fit() {
+    const s = Math.min(col.clientWidth / 460, col.clientHeight / 720);
+    card.style.transform = `scale(${s})`;
+    card.style.left = Math.max(0, (col.clientWidth - 460 * s) / 2) + 'px';
+    card.style.top = Math.max(0, (col.clientHeight - 720 * s) / 2) + 'px';
+  }
+  addEventListener('resize', fit);
+  fit();
+</script>
+</body>
+</html>

@@ -39,7 +39,7 @@ jobs:
         run: |
           mkdir -p site
           node scripts/render-elpris-svg.mjs site/elpris.svg
-          cp index.html site/
+          cp index.html skaerm.html site/
 
       - uses: actions/upload-pages-artifact@v3
         with:
