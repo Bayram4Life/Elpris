@@ -6,7 +6,7 @@ name: Elpris-billede til Marco
 
 on:
   schedule:
-    - cron: '3 * * * *'   # hver time, 3 min over (UTC, men scriptet regner selv i dansk tid)
+    - cron: '2,17,32,47 * * * *'   # 4 gange i timen: GitHub springer ofte planlagte kørsler over
   push:
     branches: [main]
   workflow_dispatch:
