@@ -94,6 +94,12 @@ body {
   width:48px;
   text-align:right;
 }
+.source {
+  margin-top:10px;
+  font-size:10px;
+  color: var(--muted);
+  text-align:right;
+}
 </style>
 </head>
 <body>
@@ -101,33 +107,13 @@ body {
 <script>
 const pad = n => String(n).padStart(2, '0');
 
-// ─── AFGIFTER OG TARIFFER ────────────────────────────────
-const ELAFGIFT      = 0.01;
-const TRANSMISSION  = 0.14;
-const MOMS          = 1.25;
-const KORREKTION    = 0.05;
-
-const RADIUS = {
-  lav:    0.1017,
-  normal: 0.1694,
-  hoj:    0.5081
-};
-
-function getRadiusTarif(hour) {
-  if (hour >= 0  && hour <= 5)  return RADIUS.lav;
-  if (hour >= 17 && hour <= 20) return RADIUS.hoj;
-  return RADIUS.normal;
-}
-
-function beregnPris(spotPris, hour) {
-  const radiusTarif = getRadiusTarif(hour);
-  return ((spotPris + ELAFGIFT + TRANSMISSION + radiusTarif) * MOMS) - KORREKTION;
-}
+// ─── KILDE ───────────────────────────────────────────────
+// Fuld pris inkl. nettarif, Energinet-tariffer, elafgift og moms fra Strømligning
+// (samme tal som altidenergi.dk/prisside). Skift netselskab/produkt her.
+const AREA     = 'DK2';
+const SUPPLIER = 'radius_c';
+const PRODUCT  = 'altid-energi';
 // ─────────────────────────────────────────────────────────
-
-function apiUrl(d) {
-  return `https://www.elprisenligenu.dk/api/v1/prices/${d.getFullYear()}/${pad(d.getMonth()+1)}-${pad(d.getDate())}_DK2.json`;
-}
 
 // Skalér bjælke: billigste = MIN_BAR%, dyreste = 100%
 const MIN_BAR = 25;
@@ -139,44 +125,38 @@ function beregnBjælke(pris, min, max) {
 
 async function load() {
   const now = new Date();
-  const currentHour = now.getHours();
+  const from = new Date(now.getTime() - 2 * 3600e3).toISOString();
+  const to   = new Date(now.getTime() + 36 * 3600e3).toISOString();
+  const url = `https://stromligning.dk/api/prices?productId=${PRODUCT}&supplierId=${SUPPLIER}&priceArea=${AREA}` +
+              `&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`;
+  const data = await (await fetch(url)).json();
 
-  // Hent dagens data
-  const resToday = await fetch(apiUrl(now));
-  const dataToday = await resToday.json();
-
-  // Hent morgendagens data
-  const tomorrow = new Date(now);
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  let dataTomorrow = [];
-  try {
-    const resTomorrow = await fetch(apiUrl(tomorrow));
-    if (resTomorrow.ok) {
-      dataTomorrow = await resTomorrow.json();
-    }
-  } catch(e) {}
-
-  // Byg rullende 24 timers vindue fra nuværende time
-  const window24 = [];
-  for (let i = 0; i < 24; i++) {
-    const hour = (currentHour + i) % 24;
-    const isNextDay = (currentHour + i) >= 24;
-    if (isNextDay && dataTomorrow.length > 0) {
-      window24.push({ hour, spotPris: dataTomorrow[hour].DKK_per_kWh, isNextDay: true });
-    } else if (!isNextDay) {
-      window24.push({ hour, spotPris: dataToday[hour].DKK_per_kWh, isNextDay: false });
-    }
+  // Saml kvarterspriser til timepriser (gennemsnit)
+  const hours = new Map();
+  for (const e of data.prices) {
+    const key = Math.floor(new Date(e.date).getTime() / 3600e3) * 3600e3;
+    if (!hours.has(key)) hours.set(key, []);
+    hours.get(key).push(e.price.total);
   }
 
-  // Beregn priser for vinduet
-  const prices = window24.map(e => beregnPris(e.spotPris, e.hour));
+  // Rullende 24 timers vindue fra nuværende time
+  const thisHour = Math.floor(now.getTime() / 3600e3) * 3600e3;
+  const window24 = [];
+  for (let i = 0; i < 24; i++) {
+    const key = thisHour + i * 3600e3;
+    const arr = hours.get(key);
+    if (!arr) break;
+    window24.push({ hour: new Date(key).getHours(), pris: arr.reduce((a, b) => a + b, 0) / arr.length });
+  }
+
+  const prices = window24.map(e => e.pris);
   const min = Math.min(...prices);
   const max = Math.max(...prices);
   const avg = prices.reduce((a,b) => a+b, 0) / prices.length;
-  const current = beregnPris(dataToday[currentHour].DKK_per_kWh, currentHour);
+  const current = prices[0];
 
   function color(v) {
-    const r = (v - min) / (max - min);
+    const r = max === min ? 0 : (v - min) / (max - min);
     return r < 0.33 ? 'var(--low)' : r < 0.66 ? 'var(--mid)' : 'var(--high)';
   }
 
@@ -185,7 +165,7 @@ async function load() {
   }
 
   const bars = window24.map((e, i) => {
-    const pris = prices[i];
+    const pris = e.pris;
     const pct = beregnBjælke(pris, min, max);
     const isCurrentHour = i === 0;
     return `
@@ -215,11 +195,12 @@ async function load() {
       <div><span>Høj</span><br>${format(max)}</div>
     </div>
     <div class="bar-list">${bars}</div>
+    <div class="source">Strømligning · Altid Energi · Radius C</div>
   `;
 }
 
-load();
-setInterval(load, 900000);
+load().catch(e => console.error('Elpris:', e));
+setInterval(() => load().catch(e => console.error('Elpris:', e)), 900000);
 </script>
 </body>
 </html>
