@@ -1,5 +1,6 @@
-// Tegner elpris-kortet (samme udseende som index.html) som en statisk SVG,
-// så det kan vises på skærme der ikke kan køre JavaScript/iframes (fx Marco Cloud via Custom CSS).
+// Tegner elpriskortet som en statisk SVG (og i workflowet som PNG til Marcos billed-widget).
+// Priserne kommer fra Strømligning: den fulde pris inkl. nettarif, Energinet-tariffer, elafgift og moms
+// for Altid Energi (strøm til indkøbspris) hos Radius C i DK2 – samme tal som altidenergi.dk/prisside.
 // Brug: node scripts/render-elpris-svg.mjs <output.svg>
 // Kræver Node 20+ (indbygget fetch). Ingen afhængigheder.
 
@@ -7,23 +8,11 @@ import { writeFileSync } from 'node:fs';
 
 const OUT = process.argv[2] || 'elpris.svg';
 const TZ = 'Europe/Copenhagen';
-const AREA = 'DK2';
 
-// ─── AFGIFTER OG TARIFFER (samme som index.html) ─────────
-const ELAFGIFT     = 0.01;
-const TRANSMISSION = 0.14;
-const MOMS         = 1.25;
-const KORREKTION   = 0.05;
-const RADIUS = { lav: 0.1017, normal: 0.1694, hoj: 0.5081 };
-
-function getRadiusTarif(hour) {
-  if (hour >= 0 && hour <= 5) return RADIUS.lav;
-  if (hour >= 17 && hour <= 20) return RADIUS.hoj;
-  return RADIUS.normal;
-}
-function beregnPris(spotPris, hour) {
-  return ((spotPris + ELAFGIFT + TRANSMISSION + getRadiusTarif(hour)) * MOMS) - KORREKTION;
-}
+// ─── Kilde ───────────────────────────────────────────────
+const AREA     = 'DK2';
+const SUPPLIER = 'radius_c';      // netselskab
+const PRODUCT  = 'altid-energi';  // elselskab/produkt
 // ─────────────────────────────────────────────────────────
 
 const C = { text: '#fff', muted: 'rgba(255,255,255,0.6)', track: 'rgba(255,255,255,0.08)',
@@ -40,37 +29,38 @@ function cphParts(d) {
   return { y: p.year, m: p.month, d: p.day, h: Number(p.hour), min: p.minute };
 }
 
-// Henter en dag og samler til timepriser (virker både med 24 timer og 96 kvarterer)
-async function hentDag(parts) {
-  const url = `https://www.elprisenligenu.dk/api/v1/prices/${parts.y}/${parts.m}-${parts.d}_${AREA}.json`;
-  const res = await fetch(url);
-  if (!res.ok) return null;
-  const data = await res.json();
-  const byHour = new Map();
-  for (const e of data) {
-    const h = cphParts(new Date(e.time_start)).h;
-    if (!byHour.has(h)) byHour.set(h, []);
-    byHour.get(h).push(e.DKK_per_kWh);
-  }
-  const out = new Map();
-  for (const [h, arr] of byHour) out.set(h, arr.reduce((a, b) => a + b, 0) / arr.length);
-  return out;
-}
-
 const now = new Date();
 const nu = cphParts(now);
-const today = await hentDag(nu);
-if (!today) throw new Error('Kunne ikke hente dagens priser');
-const tomorrow = await hentDag(cphParts(new Date(now.getTime() + 24 * 3600 * 1000)));
+
+// Hent fra 2 timer tilbage til 36 timer frem (morgendagens priser kommer ved middagstid)
+const from = new Date(now.getTime() - 2 * 3600e3).toISOString();
+const to   = new Date(now.getTime() + 36 * 3600e3).toISOString();
+const url = `https://stromligning.dk/api/prices?productId=${PRODUCT}&supplierId=${SUPPLIER}&priceArea=${AREA}` +
+            `&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`;
+const res = await fetch(url, { headers: { 'User-Agent': 'Elpris-widget (github.com/Bayram4Life/Elpris)' } });
+if (!res.ok) throw new Error(`Strømligning svarede ${res.status}`);
+const data = await res.json();
+if (!data.prices?.length) throw new Error('Ingen priser fra Strømligning');
+
+// Saml kvarterspriser til timepriser (gennemsnit), nøgle = starttidspunkt for timen
+const hours = new Map();
+for (const e of data.prices) {
+  const t = new Date(e.date);
+  const key = Math.floor(t.getTime() / 3600e3) * 3600e3;
+  if (!hours.has(key)) hours.set(key, []);
+  hours.get(key).push(e.price.total);
+}
 
 // Rullende 24-timers vindue fra nuværende time
+const thisHour = Math.floor(now.getTime() / 3600e3) * 3600e3;
 const win = [];
 for (let i = 0; i < 24; i++) {
-  const hour = (nu.h + i) % 24;
-  const src = nu.h + i >= 24 ? tomorrow : today;
-  if (!src || !src.has(hour)) { if (nu.h + i >= 24) break; else continue; }
-  win.push({ hour, pris: beregnPris(src.get(hour), hour) });
+  const key = thisHour + i * 3600e3;
+  const arr = hours.get(key);
+  if (!arr) break;
+  win.push({ hour: cphParts(new Date(key)).h, pris: arr.reduce((a, b) => a + b, 0) / arr.length });
 }
+if (!win.length) throw new Error('Ingen pris for den aktuelle time');
 const prices = win.map(e => e.pris);
 const min = Math.min(...prices), max = Math.max(...prices);
 const avg = prices.reduce((a, b) => a + b, 0) / prices.length;
@@ -118,7 +108,7 @@ const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" 
   <text x="${W - P - badgeW / 2}" y="90" text-anchor="middle" font-size="21" font-weight="600" fill="${C.text}">${badgeText}</text>
   ${stat(P, 'start', 'Lav', min)}${stat(W / 2, 'middle', 'Snit', avg)}${stat(W - P, 'end', 'Høj', max)}
   ${rows}
-  <text x="${W - P}" y="${H - 10}" text-anchor="end" font-size="14" fill="${C.muted}">Opdateret ${pad(nu.h)}:${nu.min}</text>
+  <text x="${W - P}" y="${H - 10}" text-anchor="end" font-size="14" fill="${C.muted}">Strømligning · Altid Energi · Radius C · opdateret ${pad(nu.h)}:${nu.min}</text>
 </svg>
 `;
 
